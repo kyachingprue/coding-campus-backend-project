@@ -48,6 +48,8 @@ The backend source is TypeScript. Run `npm run build` to compile it into
 
 Do not commit real secrets. URL-encode special characters in the MongoDB username/password within `MONGODB_URI`. For production, use your host's secret manager and HTTPS, use Stripe live keys only after deploying a verified webhook, and set `NODE_ENV=production` and `CLIENT_URL` to the production frontend domain.
 
+For a Vercel backend deployment, set `MONGODB_URI`, `JWT_SECRET`, `NODE_ENV=production`, and `CLIENT_URL` in the backend project's Production environment. Allow the deployed backend to connect to MongoDB in Atlas Network Access. The API connects before handling requests and reuses its connection in warm serverless instances.
+
 ## Google Drive video links
 
 Upload videos to Google Drive yourself, then set General access to **Anyone with the link** as a viewer. In the instructor course builder, paste the video's sharing URL into its lesson and save the draft. The backend validates and stores the submitted URL alongside its Drive file ID. For playback, it issues a time-limited lesson URL and streams byte-range requests from Drive through the backend, avoiding browser restrictions on direct Drive media links. It does not upload video files or call the Google Drive API, so no Google OAuth credentials or Drive API setup are required. Public-link access means the source video can be viewed outside the website by anyone who has its link.
