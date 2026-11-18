@@ -46,6 +46,7 @@ app.use("/api/enrollments", require("./routes/enrollmentRoutes"));
 app.use("/api/payments", require("./routes/paymentRoutes"));
 app.use("/api/uploads", require("./routes/uploadRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
+app.use("/api/support", require("./routes/supportRoutes"));
 
 app.use((req: Request, res: Response) => res.status(404).json({ error: `Route not found: ${req.method} ${req.path}` }));
 app.use(errorHandler as ErrorRequestHandler);

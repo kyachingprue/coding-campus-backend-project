@@ -2,13 +2,38 @@ const User = require("../models/User");
 const Course = require("../models/Course");
 const Payment = require("../models/Payment");
 const Enrollment = require("../models/Enrollment");
+const SupportCall = require("../models/SupportCall");
 import HttpError = require("../utils/httpError");
 import asyncHandler = require("../utils/asyncHandler");
-import { requireUser } from "../utils/request";
+import { requireUser, requireValidated } from "../utils/request";
 
 exports.listUsers = asyncHandler(async (req, res) => {
-  const users = await User.find().sort({ createdAt: -1 }).limit(200);
-  res.json({ users });
+  const { page: pageValue = "1", limit: limitValue = "50", search = "", role } = requireValidated(req).query;
+  const page = Math.min(1_000_000, Math.max(1, Number(pageValue) || 1));
+  const limit = Math.min(100, Math.max(1, Number(limitValue) || 50));
+  const filter: Record<string, unknown> = {};
+  if (role) filter.role = role;
+  if (search) {
+    const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    filter.$or = [
+      { name: { $regex: escapedSearch, $options: "i" } },
+      { email: { $regex: escapedSearch, $options: "i" } },
+      { _id: /^[a-f\d]{24}$/i.test(search) ? search : null },
+    ];
+  }
+  const [records, total] = await Promise.all([
+    User.find(filter).select("name email role isActive createdAt").sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
+    User.countDocuments(filter),
+  ]);
+  const users = records.map((user: any) => ({
+    id: String(user._id),
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    isActive: user.isActive,
+    createdAt: user.createdAt,
+  }));
+  res.json({ users, total, page, pages: Math.max(1, Math.ceil(total / limit)) });
 });
 
 exports.updateUserRole = asyncHandler(async (req, res) => {
@@ -28,6 +53,38 @@ exports.updateUserRole = asyncHandler(async (req, res) => {
   const user = await User.findByIdAndUpdate(req.params.id, { role }, { new: true, runValidators: true });
   if (!user) throw new HttpError(404, "User not found.");
   res.json({ user });
+});
+
+exports.deleteUser = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id).select("role");
+  if (!user) throw new HttpError(404, "User not found.");
+  if (String(requireUser(req).id) === req.params.id) {
+    throw new HttpError(400, "You cannot delete your own account while signed in.");
+  }
+  if (user.role === "admin" && await User.countDocuments({ role: "admin" }) <= 1) {
+    throw new HttpError(400, "You cannot delete the last administrator.");
+  }
+
+  const authoredCourses = await Course.find({ instructor: user._id }).select("_id");
+  const courseIds = authoredCourses.map((course: any) => course._id);
+  if (courseIds.length) {
+    const [enrolledCourseIds, paidCourseIds] = await Promise.all([
+      Enrollment.distinct("course", { course: { $in: courseIds } }),
+      Payment.distinct("course", { course: { $in: courseIds } }),
+    ]);
+    const preservedIds = [...new Set([...enrolledCourseIds, ...paidCourseIds].map(String))];
+    const preservedSet = new Set(preservedIds);
+    const removableIds = courseIds.filter((id: any) => !preservedSet.has(String(id)));
+    if (preservedIds.length) {
+      await Course.updateMany({ _id: { $in: preservedIds } }, { $set: { isPublished: false } });
+    }
+    if (removableIds.length) await Course.deleteMany({ _id: { $in: removableIds } });
+  }
+
+  await Enrollment.deleteMany({ student: user._id });
+  await SupportCall.deleteMany({ $or: [{ initiator: user._id }, { recipient: user._id }] });
+  await user.deleteOne();
+  res.json({ message: "User deleted. Courses with learners or payment history were archived; payment records were retained." });
 });
 
 exports.getAnalytics = asyncHandler(async (_req, res) => {
@@ -277,6 +334,7 @@ exports.listPayments = asyncHandler(async (_req, res) => {
 module.exports = {
   listUsers: exports.listUsers,
   updateUserRole: exports.updateUserRole,
+  deleteUser: exports.deleteUser,
   getAnalytics: exports.getAnalytics,
   listStudents: exports.listStudents,
   listInstructors: exports.listInstructors,

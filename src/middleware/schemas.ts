@@ -35,6 +35,29 @@ const mongoIdParams = z.object({
   params: z.object({ id: objectId }),
   query: z.object({}),
 });
+const adminUsersQuerySchema = z.object({
+  body: z.object({}),
+  params: z.object({}),
+  query: z.object({
+    page: z.string().regex(/^[1-9]\d{0,7}$/).default("1"),
+    limit: z.string().regex(/^\d+$/).default("50"),
+    search: z.string().trim().max(120).optional(),
+    role: z.enum(["student", "instructor", "admin"]).optional(),
+  }),
+});
+const supportCallSchema = z.object({
+  body: z.object({
+    recipientId: objectId,
+    topic: z.string().trim().max(120).optional(),
+  }),
+  params: z.object({}),
+  query: z.object({}),
+});
+const supportCallActionSchema = z.object({
+  body: z.object({ action: z.enum(["accept", "decline", "end"]) }),
+  params: z.object({ id: objectId }),
+  query: z.object({}),
+});
 const lessonVideoLinkSchema = z.object({
   body: z.object({
     lessonId: objectId,
@@ -145,6 +168,9 @@ module.exports = {
   emailSchema,
   verifyEmailSchema,
   mongoIdParams,
+  adminUsersQuerySchema,
+  supportCallSchema,
+  supportCallActionSchema,
   lessonVideoLinkSchema,
   courseListSchema,
   checkoutSessionParams,

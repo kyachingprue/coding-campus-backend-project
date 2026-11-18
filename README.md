@@ -108,8 +108,14 @@ Dashboard routes are role-specific: students use `/dashboard`, instructors use `
 | GET | `/admin/analytics` | Admin | Platform totals, monthly revenue, course demand, and instructor income |
 | GET | `/admin/payments` | Admin | Recent platform payment records |
 | GET | `/admin/settings` | Admin | Environment capabilities and platform totals (no secrets) |
+| GET | `/support/contacts` | Signed in | Role-appropriate support contacts (students see instructors/admins; instructors see students/admins; admins see students/instructors) |
+| GET | `/support/calls` | Signed in | Active support calls involving the current user |
+| POST | `/support/calls` | Signed in | Invite an eligible campus member to a Jitsi Meet room |
+| PATCH | `/support/calls/:id` | Call participants | Accept, decline, or end a support call |
 
-The Socket.IO connection authenticates using the same HTTP-only cookie. Clients join only their own `user:<id>` room; successful payment emits `enrollment:created` to that learner. Admin sockets also join `role:admin`.
+Support calls use the free public Jitsi Meet service. Room names are generated server-side with cryptographically random values; an invitation is visible only to its two campus accounts in the dashboard. Anyone who obtains a room link may still be able to join through Jitsi, so avoid discussing sensitive information. Call invitations expire automatically.
+
+The Socket.IO connection authenticates using the same HTTP-only cookie. Clients join only their own `user:<id>` room; successful payment emits `enrollment:created` to that learner, and support-call invitations/status changes are sent to the call participant. Admin sockets also join `role:admin`.
 
 ## Important notes
 

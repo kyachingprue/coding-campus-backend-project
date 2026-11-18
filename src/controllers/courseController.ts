@@ -3,6 +3,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 const Course = require("../models/Course");
 const Enrollment = require("../models/Enrollment");
+const Payment = require("../models/Payment");
 import HttpError = require("../utils/httpError");
 import asyncHandler = require("../utils/asyncHandler");
 import type { Request } from "express";
@@ -245,10 +246,10 @@ function getDriveFileIdFromLessonUrl(videoUrl: string): string {
 
 exports.deleteCourse = asyncHandler(async (req, res) => {
   const course = await ownedCourse(req);
-  if (await Enrollment.exists({ course: course.id })) {
+  if (await Enrollment.exists({ course: course.id }) || await Payment.exists({ course: course.id })) {
     course.isPublished = false;
     await course.save();
-    return res.json({ message: "Course archived because learners are enrolled." });
+    return res.json({ message: "Course archived because it has learner or payment history." });
   }
   await course.deleteOne();
   res.json({ message: "Course deleted." });

@@ -1,6 +1,6 @@
  const test = require("node:test");
 const assert = require("node:assert/strict");
-const { registerSchema, verifyEmailSchema, courseSchema, courseUpdateSchema, profileSchema, checkoutSessionSchema, lessonVideoLinkSchema, lessonProgressSchema } = require("../src/middleware/schemas");
+const { registerSchema, verifyEmailSchema, courseSchema, courseUpdateSchema, profileSchema, checkoutSessionSchema, lessonVideoLinkSchema, lessonProgressSchema, adminUsersQuerySchema, supportCallSchema, supportCallActionSchema } = require("../src/middleware/schemas");
 const { isImageFile } = require("../src/middleware/upload");
 const { courseLessons, courseCurriculum } = require("../src/utils/courseLessons");
 const { getGoogleDriveFileId, googleDriveVideoUrl } = require("../src/utils/googleDriveLink");
@@ -34,6 +34,45 @@ test("email verification accepts only a six-digit code and a valid email", () =>
   assert.equal(verifyEmailSchema.safeParse({
     ...emptyRequestParts,
     body: { email: "ada@example.com", code: "12345x" },
+  }).success, false);
+});
+
+test("admin user search accepts bounded pagination and known roles", () => {
+  assert.equal(adminUsersQuerySchema.safeParse({
+    ...emptyRequestParts,
+    body: {},
+    query: { page: "2", limit: "50", search: "ada", role: "instructor" },
+  }).success, true);
+  assert.equal(adminUsersQuerySchema.safeParse({
+    ...emptyRequestParts,
+    body: {},
+    query: { page: "-1", limit: "50" },
+  }).success, false);
+  assert.equal(adminUsersQuerySchema.safeParse({
+    ...emptyRequestParts,
+    body: {},
+    query: { page: "1", limit: "50", role: "superadmin" },
+  }).success, false);
+});
+
+test("support calls accept only valid recipient IDs, short topics, and known actions", () => {
+  assert.equal(supportCallSchema.safeParse({
+    ...emptyRequestParts,
+    body: { recipientId: "507f1f77bcf86cd799439011", topic: "Course guidance" },
+  }).success, true);
+  assert.equal(supportCallSchema.safeParse({
+    ...emptyRequestParts,
+    body: { recipientId: "invalid-id" },
+  }).success, false);
+  assert.equal(supportCallActionSchema.safeParse({
+    ...emptyRequestParts,
+    body: { action: "accept" },
+    params: { id: "507f1f77bcf86cd799439011" },
+  }).success, true);
+  assert.equal(supportCallActionSchema.safeParse({
+    ...emptyRequestParts,
+    body: { action: "join" },
+    params: { id: "507f1f77bcf86cd799439011" },
   }).success, false);
 });
 
